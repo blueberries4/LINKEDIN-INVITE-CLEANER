@@ -1,0 +1,43 @@
+<!doctype html>
+<html>
+  <head>
+    <title>LinkedIn Cleaner</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        width: 250px;
+        padding: 15px;
+      }
+      button {
+        width: 100%;
+        padding: 8px;
+        margin-top: 10px;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <h3>Withdraw Invites</h3>
+
+    <label>Older than:</label>
+    <select id="months">
+      <option value="1">1 Month</option>
+      <option value="3">3 Months</option>
+      <option value="6">6 Months</option>
+      <option value="12">12 Months</option>
+    </select>
+
+    <label>Max per run:</label>
+    <select id="limit">
+      <option value="5">5</option>
+      <option value="10">10</option>
+      <option value="20">20</option>
+      <option value="30">30</option>
+      <option value="50">50</option>
+    </select>
+
+    <button id="startBtn">Start</button>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
