@@ -2,7 +2,7 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function randomDelay(min = 3000, max = 7000) {
+function randomDelay(min = 1000, max = 5000) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
@@ -207,6 +207,9 @@ async function withdrawInvites(targetMonths, maxLimit) {
           break;
         }
 
+        // Check if this is the last card
+        const isLastCard = (i === cards.length - 1);
+
         // Debug: Log all text content of the card
         console.log(`Card ${i}:`, card.innerText);
 
@@ -272,7 +275,11 @@ async function withdrawInvites(targetMonths, maxLimit) {
             console.warn(`Card ${i}: Could not find confirmation button`);
           }
 
-          await sleep(randomDelay());
+          // Only delay if not the last operation and haven't reached limit
+          const isLastWithdrawal = (withdrawn >= maxLimit) || isLastCard;
+          if (!isLastWithdrawal) {
+            await sleep(randomDelay());
+          }
         }
       } catch (cardError) {
         console.error(`Error processing card ${i}:`, cardError);

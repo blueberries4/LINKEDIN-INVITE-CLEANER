@@ -40,13 +40,12 @@ The extension will be available on the Chrome Web Store once approved.
 
 ## Permissions Explained
 
-| Permission                        | Purpose                                        |
-| --------------------------------- | ---------------------------------------------- |
-| `activeTab`                       | Identifies the LinkedIn tab you're viewing     |
-| `scripting`                       | Executes the withdrawal automation on LinkedIn |
-| `host_permissions` (linkedin.com) | Accesses LinkedIn's invitation manager pages   |
+| Permission                        | Purpose                                      |
+| --------------------------------- | -------------------------------------------- |
+| `activeTab`                       | Identifies the LinkedIn tab you're viewing   |
+| `host_permissions` (linkedin.com) | Accesses LinkedIn's invitation manager pages |
 
-**No data is collected, stored, or transmitted** - all processing happens locally on your device.
+**No data is collected, stored, or transmitted** - all processing happens locally on your device. Only the minimum necessary permissions are requested.
 
 ## Project Structure
 
@@ -146,4 +145,5 @@ For issues or questions, check the console logs (F12) for detailed error message
 ---
 
 **Made with ❤️ for LinkedIn users tired of managing old invitations**
+
 # LINKEDIN-INVITE-CLEANER

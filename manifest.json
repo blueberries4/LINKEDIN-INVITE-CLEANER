@@ -3,7 +3,7 @@
   "name": "LinkedIn Invite Cleaner",
   "version": "1.0",
   "description": "Withdraw LinkedIn invites older than selected months.",
-  "permissions": ["scripting", "activeTab"],
+  "permissions": ["activeTab"],
   "host_permissions": ["https://www.linkedin.com/*"],
   "icons": {
     "16": "assets/icons/icon16.png",

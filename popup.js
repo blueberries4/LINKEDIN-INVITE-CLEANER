@@ -14,9 +14,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     console.log(`Sending message: months=${months}, limit=${limit}`);
 
-    // Disable button to prevent double clicks
+    // Disable button and show spinner
     startBtn.disabled = true;
-    startBtn.innerText = "Processing...";
+    startBtn.style.display = "none";
+    document.getElementById("spinner").style.display = "block";
 
     chrome.runtime.sendMessage(
       {
@@ -36,7 +37,8 @@ document.addEventListener("DOMContentLoaded", () => {
           } else {
             console.error("Message error:", errorMsg);
             startBtn.disabled = false;
-            startBtn.innerText = "Start";
+            startBtn.style.display = "block";
+            document.getElementById("spinner").style.display = "none";
             alert(`Error: ${errorMsg}\n\nPlease make sure you're on the LinkedIn Sent Invitations page.`);
           }
         } else {

@@ -29,6 +29,7 @@
 
     <label>Max per run:</label>
     <select id="limit">
+      <option value="2">2</option>
       <option value="5">5</option>
       <option value="10">10</option>
       <option value="20">20</option>
@@ -37,6 +38,32 @@
     </select>
 
     <button id="startBtn">Start</button>
+    <div
+      id="spinner"
+      style="display: none; text-align: center; margin-top: 10px"
+    >
+      <div
+        style="
+          display: inline-block;
+          width: 20px;
+          height: 20px;
+          border: 3px solid #f3f3f3;
+          border-top: 3px solid #0a66c2;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        "
+      ></div>
+    </div>
+    <style>
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
 
     <script src="popup.js"></script>
   </body>
