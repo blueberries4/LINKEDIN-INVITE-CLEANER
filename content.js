@@ -1,13 +1,19 @@
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
+// Prevent duplicate initialization
+if (window.__linkedinCleanerInitialized) {
+  console.log("LinkedIn Cleaner already initialized, skipping...");
+} else {
+  window.__linkedinCleanerInitialized = true;
+  
+  function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
 
-function randomDelay(min = 1000, max = 5000) {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
+  function randomDelay(min = 1000, max = 5000) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
 
-// Global flag to cancel operation
-let cancelRequested = false;
+  // Global flag to cancel operation
+  let cancelRequested = false;
 
 async function autoScroll() {
   try {
@@ -97,13 +103,14 @@ async function withdrawInvites(targetMonths, maxLimit) {
   const counterDiv = document.createElement("div");
   const cancelBtn = document.createElement("button");
   const loadingOverlay = document.createElement("div");
+  let buttonContainer = null;
   
   try {
     // Reset cancel flag
     cancelRequested = false;
 
-    // Validate inputs
-    if (!targetMonths || !maxLimit || targetMonths < 0 || maxLimit < 1) {
+    // Validate inputs - allow 0 for targetMonths ("All pending" option)
+    if (typeof targetMonths !== 'number' || typeof maxLimit !== 'number' || targetMonths < 0 || maxLimit < 1) {
       throw new Error("Invalid parameters: targetMonths and maxLimit must be valid numbers");
     }
 
@@ -140,16 +147,54 @@ async function withdrawInvites(targetMonths, maxLimit) {
     // Remove loading overlay
     loadingOverlay.remove();
 
-    // Updated selector: divs with role="listitem" instead of li.invitation-card
-    const cards = document.querySelectorAll("div[role='listitem']");
+    // Try multiple selectors for LinkedIn's cards
+    let cards = document.querySelectorAll("div[role='listitem']");
+    console.log(`Selector 'div[role=listitem]' found: ${cards.length} cards`);
+    
+    // Fallback selectors
+    if (cards.length === 0) {
+      cards = document.querySelectorAll("li.invitation-card");
+      console.log(`Selector 'li.invitation-card' found: ${cards.length} cards`);
+    }
+    if (cards.length === 0) {
+      cards = document.querySelectorAll("[data-view-name='invitation-card']");
+      console.log(`Selector '[data-view-name=invitation-card]' found: ${cards.length} cards`);
+    }
+    if (cards.length === 0) {
+      // Try to find any element that looks like an invite card
+      const allDivs = document.querySelectorAll("div");
+      const potentialCards = [];
+      for (let div of allDivs) {
+        if (div.innerText && div.innerText.includes("Withdraw") && div.innerText.includes("Sent")) {
+          potentialCards.push(div);
+        }
+      }
+      if (potentialCards.length > 0) {
+        console.log(`Found ${potentialCards.length} potential cards by text content`);
+        // Find the smallest containing elements
+        cards = potentialCards.filter(d => d.querySelector("button"));
+      }
+    }
+    
     console.log(`Total ${cards.length} invitation cards available for processing`);
+    
+    // Debug: Log first card structure
+    if (cards.length > 0) {
+      console.log("First card HTML structure:", cards[0].innerHTML.substring(0, 500));
+      console.log("First card text:", cards[0].innerText);
+    } else {
+      // Debug: Show page structure
+      console.log("Page title:", document.title);
+      console.log("Looking for any buttons with Withdraw:", 
+        Array.from(document.querySelectorAll("button")).filter(b => b.innerText.includes("Withdraw")).length);
+    }
 
     if (cards.length === 0) {
       throw new Error("No invitation cards found. Please make sure you're on the correct page.");
     }
 
     // Create container for buttons
-    const buttonContainer = document.createElement("div");
+    buttonContainer = document.createElement("div");
     buttonContainer.style.position = "fixed";
     buttonContainer.style.top = "20px";
     buttonContainer.style.right = "20px";
@@ -211,31 +256,110 @@ async function withdrawInvites(targetMonths, maxLimit) {
         const isLastCard = (i === cards.length - 1);
 
         // Debug: Log all text content of the card
-        console.log(`Card ${i}:`, card.innerText);
+        console.log(`Card ${i}:`, card.innerText.substring(0, 200));
 
-        // Find time text element - look for "Sent X weeks/months ago"
+        // Find time text element - look for "Sent X weeks/months ago" in various elements
         let timeTextEl = null;
+        let timeText = "";
+        
+        // First try paragraphs
         const paragraphs = card.querySelectorAll("p");
         for (let p of paragraphs) {
           if (p.innerText.includes("Sent")) {
             timeTextEl = p;
+            timeText = p.innerText;
             break;
           }
         }
-
+        
+        // Try spans if not found
         if (!timeTextEl) {
-          console.log(`Card ${i}: No time element found, skipping`);
+          const spans = card.querySelectorAll("span");
+          for (let span of spans) {
+            if (span.innerText.includes("Sent") || span.innerText.includes("month") || span.innerText.includes("week")) {
+              timeTextEl = span;
+              timeText = span.innerText;
+              break;
+            }
+          }
+        }
+        
+        // Try any element with time-related text
+        if (!timeTextEl) {
+          const allElements = card.querySelectorAll("*");
+          for (let el of allElements) {
+            const text = el.innerText || "";
+            if ((text.includes("month") || text.includes("week") || text.includes("day")) && text.length < 50) {
+              timeTextEl = el;
+              timeText = text;
+              break;
+            }
+          }
+        }
+        
+        // Last resort: search the entire card text
+        if (!timeText) {
+          const cardText = card.innerText;
+          const timeMatch = cardText.match(/Sent\s+\d+\s+(month|week|day)s?\s+ago/i) || 
+                           cardText.match(/\d+\s+(month|week|day)s?\s+ago/i);
+          if (timeMatch) {
+            timeText = timeMatch[0];
+          }
+        }
+
+        if (!timeText) {
+          console.log(`Card ${i}: No time text found in card content, skipping`);
           continue;
         }
 
-        const months = getMonths(timeTextEl.innerText);
-        console.log(`Card ${i}: Time text="${timeTextEl.innerText}", Months extracted=${months}, Target=${targetMonths}`);
+        const months = getMonths(timeText);
+        console.log(`Card ${i}: Time text="${timeText}", Months extracted=${months}, Target=${targetMonths}`);
 
         if (months >= targetMonths) {
-          // Find withdraw button - look for button with data-view-name containing "withdraw"
-          const withdrawBtn = card.querySelector("button[data-view-name*='withdraw']");
+          // Find withdraw button - try multiple selectors for LinkedIn UI compatibility
+          let withdrawBtn = card.querySelector("button[data-view-name*='withdraw']");
+          
+          // Fallback selectors if the primary one doesn't work
           if (!withdrawBtn) {
-            console.log(`Card ${i}: No withdraw button found, skipping`);
+            // Try finding button with "Withdraw" text using textContent (more reliable)
+            const allBtns = card.querySelectorAll("button");
+            console.log(`Card ${i}: Checking ${allBtns.length} buttons...`);
+            
+            for (let btn of allBtns) {
+              const btnText = (btn.textContent || btn.innerText || "").trim().toLowerCase();
+              const ariaLabel = (btn.getAttribute("aria-label") || "").toLowerCase();
+              console.log(`Card ${i}: Button text="${btnText}", aria-label="${ariaLabel}"`);
+              
+              if (btnText.includes("withdraw") || ariaLabel.includes("withdraw")) {
+                withdrawBtn = btn;
+                console.log(`Card ${i}: Found withdraw button via text/aria match`);
+                break;
+              }
+            }
+          }
+          
+          // Another fallback - aria-label
+          if (!withdrawBtn) {
+            withdrawBtn = card.querySelector("button[aria-label*='Withdraw']") || 
+                          card.querySelector("button[aria-label*='withdraw']");
+          }
+          
+          // Try looking for any clickable element with Withdraw text
+          if (!withdrawBtn) {
+            const allClickables = card.querySelectorAll("button, [role='button'], a");
+            for (let el of allClickables) {
+              const elText = (el.textContent || "").trim().toLowerCase();
+              if (elText === "withdraw") {
+                withdrawBtn = el;
+                console.log(`Card ${i}: Found withdraw element via exact text match`);
+                break;
+              }
+            }
+          }
+          
+          if (!withdrawBtn) {
+            console.log(`Card ${i}: No withdraw button found, skipping.`);
+            console.log(`Card ${i}: Card innerHTML sample:`, card.innerHTML.substring(0, 1000));
             continue;
           }
 
@@ -244,35 +368,67 @@ async function withdrawInvites(targetMonths, maxLimit) {
           const name = nameLink?.innerText.trim() || "Unknown";
           const url = nameLink?.href || "Unknown";
 
-          console.log(`Withdrawing: ${name}`);
+          console.log(`>>> ATTEMPTING TO WITHDRAW: ${name}`);
+          console.log(`>>> Clicking withdraw button...`);
           withdrawBtn.click();
-          await sleep(1500);
+          await sleep(2000);
 
           // Look for confirmation button in modal
           let confirmClicked = false;
-          const confirmBtn = document.querySelector("button[data-test-dialog-primary-btn]");
-          if (confirmBtn) {
-            confirmBtn.click();
-            confirmClicked = true;
-          } else {
-            // Fallback: look for button with "Withdraw" text in any modal
-            const buttons = document.querySelectorAll("button");
-            for (let btn of buttons) {
-              if (btn.innerText.includes("Withdraw")) {
+          
+          // Try multiple selectors for the confirmation dialog
+          const confirmSelectors = [
+            "button[data-test-dialog-primary-btn]",
+            "button.artdeco-modal__confirm-dialog-btn",
+            "button.artdeco-button--primary",
+            "[data-live-test-modal-primary-btn]"
+          ];
+          
+          for (const selector of confirmSelectors) {
+            const confirmBtn = document.querySelector(selector);
+            if (confirmBtn && confirmBtn.innerText.toLowerCase().includes("withdraw")) {
+              console.log(`>>> Found confirm button with selector: ${selector}`);
+              confirmBtn.click();
+              confirmClicked = true;
+              break;
+            }
+          }
+          
+          // Fallback: look for any button with "Withdraw" text in modals/dialogs
+          if (!confirmClicked) {
+            const allButtons = document.querySelectorAll("button");
+            for (let btn of allButtons) {
+              const btnText = btn.innerText.toLowerCase();
+              // Look for Withdraw button that's not the original one we clicked
+              if (btnText.includes("withdraw") && btn !== withdrawBtn) {
+                console.log(`>>> Found confirm button via text match: "${btn.innerText}"`);
                 btn.click();
                 confirmClicked = true;
                 break;
               }
             }
           }
+          
+          // Debug: Log all visible modals
+          if (!confirmClicked) {
+            const modals = document.querySelectorAll("[role='dialog'], .artdeco-modal, [data-test-modal]");
+            console.log(`>>> Found ${modals.length} modals on page`);
+            modals.forEach((m, idx) => {
+              console.log(`>>> Modal ${idx}:`, m.innerText.substring(0, 200));
+            });
+          }
 
           if (confirmClicked) {
+            await sleep(1000); // Wait for withdrawal to process
             withdrawn++;
             withdrawnData.push({ name, url, months });
             counterDiv.innerText = `Withdrawn: ${withdrawn}`;
-            console.log(`Successfully withdrawn ${name}`);
+            console.log(`>>> SUCCESS: Withdrawn ${name}`);
           } else {
-            console.warn(`Card ${i}: Could not find confirmation button`);
+            console.warn(`Card ${i}: Could not find confirmation button. Pressing Escape to close modal.`);
+            // Try to close any open modal
+            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape' }));
+            await sleep(500);
           }
 
           // Only delay if not the last operation and haven't reached limit
@@ -311,15 +467,31 @@ async function withdrawInvites(targetMonths, maxLimit) {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log("Content script received message:", message);
+  
   try {
     if (message.action === "startWithdraw") {
-      console.log("Received startWithdraw message:", message);
+      console.log("Starting withdrawal with params:", { months: message.months, limit: message.limit });
+      
+      // Verify we're on the correct page
+      const currentUrl = window.location.href;
+      console.log("Current URL:", currentUrl);
+      
+      if (!currentUrl.includes("invitation-manager/sent")) {
+        const errMsg = "Please navigate to LinkedIn Sent Invitations page:\nhttps://www.linkedin.com/mynetwork/invitation-manager/sent/";
+        console.error(errMsg);
+        alert(errMsg);
+        sendResponse({ success: false, error: errMsg });
+        return true;
+      }
       
       // Send immediate acknowledgment
       sendResponse({ success: true, message: "Starting withdrawal process" });
       
-      // Start the withdrawal process (don't await here as response is already sent)
-      withdrawInvites(message.months, message.limit);
+      // Start the withdrawal process
+      withdrawInvites(message.months, message.limit).catch(err => {
+        console.error("Withdrawal error:", err);
+      });
     }
   } catch (error) {
     console.error("Error in message listener:", error);
@@ -330,3 +502,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // Return true to indicate we'll send response asynchronously
   return true;
 });
+
+  console.log("LinkedIn Cleaner content script initialized");
+}
